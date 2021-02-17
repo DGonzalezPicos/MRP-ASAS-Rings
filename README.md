@@ -1,4 +1,4 @@
 # MRP-ASAS-Rings
 ## Master Research Project
-### Looking for transiting circumplanetary disks in the ASAS-SN database
+### Title: Looking For Transiting Circumplanetary Disks In ASAS-SN
 ### Darío González Picos / MSc. Astronomy / Leiden University
