@@ -50,8 +50,8 @@ def plot_coord(data, coord_frame, save=False):
     plt.show()
 
 # Call function to plot both frames    
-galactic = plot_coord([c_gal.l.wrap_at('180d').radian, c_gal.b.radian], 'Galactic') 
-eq = plot_coord([ra_rad, dec_rad], 'Equatorial')  
+galactic = plot_coord([c_gal.l.wrap_at('180d').radian, c_gal.b.radian], 'Galactic', save=True) 
+eq = plot_coord([ra_rad, dec_rad], 'Equatorial', save=True)
 
 
 
