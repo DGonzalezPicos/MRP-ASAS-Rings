@@ -46,7 +46,7 @@ def plot_coord(data, coord_frame, save=False):
     # ax.set_xticklabels(['14h','16h','18h','20h','22h','0h','2h','4h','6h','8h','10h'])
     # plt.subplots_adjust(top=0.95,bottom=0.0)
     if save == True:
-        plt.savefig('cat_' + coord_frame +'.png', dpi=100)
+        plt.savefig('./images/cat_' + coord_frame +'.png', dpi=100)
     plt.show()
 
 # Call function to plot both frames    
