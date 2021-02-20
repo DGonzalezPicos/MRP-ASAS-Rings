@@ -4,10 +4,12 @@ Created on Fri Feb 19 14:13:40 2021
 
 Title: Cross-matching targets from two catalogs (and coordinate plot)
 """
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
+from astropy import units as u
 # Load ASAS catalog
 file = '/home/dario/AstronomyLeiden/FRP/ASAS/asassn-catalog.csv'
 print('Reading ASAS-SN catalog...')
@@ -45,7 +47,7 @@ print('----->> Found {:} targets in common'.format(len(intersect)))
 # Get the coordinates of the targets
 
 gal_c, eq_c = ([] for i in range(2))
-for obj in asas_gaia_id:
+for obj in asas_gaia_id.unique():
     if obj in intersect.values:
         temp = intersect[intersect==obj].index
         index = int(temp.values)
@@ -71,4 +73,23 @@ def plot_coord(data, coord_frame, save=False):
 
 
 galactic = plot_coord([gal_coord.l.wrap_at('180d').radian, gal_coord.b.radian], 'CrossMatchGalactic', save=False) 
+
+
+#%%
+# Save the target's name and coordinates
+# from astropy.io import ascii
+# from astropy.table import Table
+# data_to_write = Table({'id':intersect,
+#                        'l': gal_coord.l,
+#                        'b': gal_coord.b})
+
+# ascii.write(data_to_write, 'variable_targets.txt', overwrite=True)
+
+# csv format is prefered over ascii
+df_var = pd.DataFrame({'id':intersect,
+                        'l': gal_coord.l,
+                        'b': gal_coord.b})
+output='var_targets.csv'
+print('Writing resulting catalog to "{:}"'.format(output))
+df_var.to_csv(output)
 
