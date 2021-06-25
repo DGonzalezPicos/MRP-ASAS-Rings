@@ -18,6 +18,7 @@ import pandas as pd
 import warnings
 import glob, os
 from scipy.optimize import curve_fit
+import plot_functions as plot
 
 
 ##########################
@@ -76,28 +77,30 @@ class LightCurveSet:
         assert self.extension == '.dat', 'Extension must be .dat'
             
         if self.band == 'v':
-            # temp = load_dat(file)
             data = ascii.read(file, delimiter='\t')
             df = data.to_pandas()
             df['flux_err'] = df['flux_err'].replace(99.99, np.nan)
+            df['mag_err'] = df['mag_err'].replace(99.99, np.nan)
             df = df.dropna()
             name = file.split('/')[-1][:-4]
-            # hjd, flux, errflux, name = load_dat(file)
             df['gaia_id'] = np.full_like(df['HJD'], name)
-            # convert to relative flux
+            ##1 convert to relative flux
             flux_med = np.nanmedian(df['flux'])
             df['flux'] = df['flux'] / flux_med
             df['flux_err'] = df['flux_err'] / flux_med
-            # data =  np.transpose(np.array([hjd, flux, errflux, name_col]))
-            # df = pd.DataFrame(data, columns=['HJD', 'flux','errflux','gaia_id'])
-    
+            ##1
+            
         if self.band == 'g':
-           # data is [hjd, flux, errflux, asas_id]
-            df = pd.DataFrame(np.loadtxt(file,usecols=[0,1,2,-1]), columns=['HJD', 'flux','flux_err','asas_id'])
-            df.drop(columns=['asas_id']) # remove ASAS_SN_ID 
-            df = df.dropna()
-            name = int(file.split('/')[-1][:-4])
-            df['gaia_id'] = np.full_like(df['HJD'], name)
+            data =  ascii.read(file, format='no_header')
+            df = data.to_pandas()
+            df.columns = ['HJD', 'flux', 'flux_err', 'mag','mag_err', 'limit', 'fwhm', 'quality', 'cam', 'asas_sn_id']
+        # if self.band == 'g':
+        #    # data is [hjd, flux, errflux, asas_id]
+        #     df = pd.DataFrame(np.loadtxt(file,usecols=[0,1,2,-1]), columns=['HJD', 'flux','flux_err','asas_id'])
+        #     df.drop(columns=['asas_id']) # remove ASAS_SN_ID 
+        #     df = df.dropna()
+        #     name = int(file.split('/')[-1][:-4])
+        #     df['gaia_id'] = np.full_like(df['HJD'], name)
             
             # convert to relative flux
             flux_med = np.nanmedian(df['flux'])
@@ -116,75 +119,58 @@ class LightCurveSet:
             # df['errflux'] = df['errflux'].replace(np.nan, np.nanmedian(df['errflux']))
         
         return df
-        
     
-
-def load_dat(file, y='mag'):
-    '''
-    Load LC object from .dat file
-
-    Parameters
-    ----------
-    file : string
-        full path for the file.
-    y : string
-        WHAT COLUMN TO READ FROMN THE FILE. The default is 'mag'.
-        The output is always flux, so when 'mag' is is picked, the flux will be 
-        calculated from 'mag' values
-
-    Returns
-    -------
-    hjd : array
-        time.
-    flux : array
-        Relative flux.
-    errflux : array
-        Relative error flux.
-    name : string
-        Gaia ID.
-
-    '''
+class LightCurveObject:
+    def __init__(self, gaia_id, band):
+        self.id = gaia_id
+        self.filter = band
     
-    if y =='flux':
-        err_type = 'flux_err'
-    else:
-        err_type = 'mag_err'
+    @property
+    def path(self):
+        vpath = '/home/dario/AstronomyLeiden/FRP/leiden_vband/camfix/'
+        return os.path.join(vpath, str(self.id))
+    @property
+    def data(self):
+        df = get_data(self.id)
+        df['Filter'] = np.full_like(df['HJD'], self.filter, dtype=str)
+        return get_data(self.id)
+    @property
+    def plot(self, ax=None):
+        df = self.data
+        df['mag'] = df['mag'].astype('float')
         
+        # ax = ax or plt.gca() # function embedded
+        fig, ax = plt.subplots(1, figsize=(16,7))
+        
+        cams = df['camera'].unique()
+        colors = ['brown','darkorange','chocolate']
+        print('Plotting {:} with cameras {:}'.format(self.id, cams))
+        for i, cam in enumerate(cams):
+            _ = plot.plot_cam(df, cam=cam, y='mag', ax=ax, label=cam, color=colors[i])
+            
+        ax.invert_yaxis()   
+        ax.set_title('GAIA_ID = ' + str(self.id))
+        ax.set_ylabel('Magnitude')
+        ax.set_xlabel('HJD - 2450000')
+        
+        ax.legend()
+        plt.show()
+        return ax
+        
+def get_data(gaia_id):
+    vpath = '/home/dario/AstronomyLeiden/FRP/leiden_vband/camfix/'
+    file = os.path.join(vpath, str(gaia_id)+'.dat')
     data = ascii.read(file, delimiter='\t')
-    hjd = data['HJD']
-    y_err = data[err_type]
-    
-    y_data = [] # either 'flux' or 'mag'
-    for item in data[y]:
-        a  = str(type(item))
-        if a == "<class 'numpy.str_'>":
-            y_data.append(float(item.split('>')[-1]))
-        else:
-            y_data.append(item)
+    df = data.to_pandas()
+    df['flux_err'] = df['flux_err'].replace(99.99, np.nan)
+    df['mag_err'] = df['mag_err'].replace(99.99, np.nan)
+    df = df.dropna()
+    ##1 convert to relative flux
+    flux_med = np.nanmedian(df['flux'])
+    df['flux'] = df['flux'] / flux_med
+    df['flux_err'] = df['flux_err'] / flux_med
+    return df    
 
-    
-    name = file.split('/')[-1][:-4]
-    
-    # Fix "infinite values" for the "errflux" data by
-    # replacing them with the median
-    med = np.median(y_err)
-    if med > 90:
-        print('Error bars not valid for plot ', name)
-    
-    y_err = np.array(y_err)                 # convert to np.array
-    med = np.median(y_err[y_err<90])    # compute the median clipping values >90
-    y_err[y_err>90] = med               # replace conflicting values with the median
-    
-    if y =='mag':     
-        mag = np.array(y_data)              # renaming for readability
-        errmag = np.array(y_err)            # renaming for readability
-        med_mag = np.median(mag)
-        flux = 10**(-mag/2.5) 
-        flux_rel = flux / np.median(flux)
-        errflux_rel = flux_rel * errmag / 1.09 # http://slittlefair.staff.shef.ac.uk/teaching/phy217/lectures/stats/L18/index.html#magnitudes
-
-        
-    return hjd, flux_rel, errflux_rel, name
 
 def read_gband(file):
     data = np.loadtxt(file)
@@ -216,6 +202,23 @@ def read_gband(file):
     errflux_rel = errflux / np.median(flux)
     
     return hjd, flux_rel, errflux_rel, name
+def read_vband(gaia_id):
+    path = '/home/dario/AstronomyLeiden/FRP/leiden_vband/camfix/'
+    file = path + str(gaia_id) +'.dat'
+    data = ascii.read(file, delimiter='\t')
+    df = data.to_pandas()
+    df['flux_err'] = df['flux_err'].replace(99.99, np.nan)
+    # df = df.replace(99.99, np.nan)
+    df = df.dropna()
+    # name = file.split('/')[-1][:-4]
+    
+    # convert to relative flux
+    flux_med = np.nanmedian(df['flux'])
+    df['flux'] = df['flux'] / flux_med
+    df['flux_err'] = df['flux_err'] / flux_med
+    print(df)
+    
+    return df
 #-----------------------------------------------------------------------------
 def iterative_clipping(time, flux, errflux, eps=0.05, maxiter=10):
     '''
@@ -350,8 +353,8 @@ def lombscargle_periodogram(time, flux, error, dt=0, min_period=0.1,
     except:
         print('No peaks found on Periodogram')
         period = 1.0 # day
-    while (abs(period - 1.0) < 0.1) or (abs(period - 0.50) < 0.1)  :
-        print('Removed 1-day period signal')
+    while (abs(period - 1.0) < 0.1) or (abs(period - 0.50) < 0.1) or (abs(period - 0.33) < 0.1)  :
+        print('Removed 1-day derived period signal')
         peak_ind += 1 
         period = periods[inds[-1 - peak_ind]]
         

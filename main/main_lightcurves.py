@@ -36,7 +36,7 @@ file = lcs.files()[-4]
 df = lcs.data(file)
 
 #%%
-
+outlier_count = []
     
 # file = lcs.files()[3829]
 # for file in lcs.files()[:100]:
@@ -61,11 +61,20 @@ def LC_pro(file, show=False):
     # mean_mag = float(df['mean_mag'].unique())
     mean_mag = float(df['mag'].mean())
     
+    outliers = len(df['mag'][abs(df['mag'] - mean_mag) > 0.5])
+    print('Outliers {:}'.format(outliers))
+    if outliers > 10:
+        outlier_count.append(mean_mag)
+
+    # BY DEFAULT
     skip = False
     
-    if mean_mag > 17.0:
+    
+    if outliers < 10:
         skip = True
-    if len(df) < 20:
+    if mean_mag > 15.95:
+        skip = True
+    if len(df) < 30:
         skip = True
         
     
@@ -130,6 +139,7 @@ def LC_pro(file, show=False):
         time_corr = time - 2450000 # transform HDJ date
         # ax1.errorbar(time_corr, flux, errflux, fmt='.k', alpha=0.6, label=label)
         ax1.plot(time_corr, df['mag'],'.k', alpha=0.6, label=label)
+
         ax1.set_title('GAIA_ID = ' + name)
         # ax1.set_ylabel('Relative flux')
         ax1.set_ylabel('Magnitude')
@@ -143,6 +153,9 @@ def LC_pro(file, show=False):
         else:
             color_mag = 'darkgreen'
         ax1.text(x=0.02, y=0.89, s=mean_mag_str, transform=ax1.transAxes, color=color_mag)
+        bars = [0, int(np.round(len(df) / 2.)), -1]
+        ax1.errorbar(time_corr[bars], df['mag'].values[bars], df['mag_err'].values[bars], 
+                     fmt='.', color=color_mag, alpha=0.3)
         
         ymin_auto, ymax_auto = ax1.yaxis.get_data_interval()
         # ax1.set_ylim(ymin=np.max([ymin_auto, 0.0]))
@@ -197,7 +210,8 @@ file = lcs.files()[random]
 # file = '/home/dario/AstronomyLeiden/FRP/leiden_vband/camfix/274979577422304000.dat'
 
 # test =  LC_pro(file, show=True)
-#%% inspecting individual LCs
+# inspecting individual LCs
+#%%
 '''
 df = lcs.data(file)
 df
@@ -214,7 +228,7 @@ df['mag'] = df['mag'].astype('float')
 
 df = df.dropna()
 df.head()
-plt.plot(df['HJD'], df['flux'],'.')
+plot.plot_lc(df, y='mag', name=str(int(df['gaia_id'][0])))
 plt.show()
 
 df
@@ -229,11 +243,30 @@ errflux_sv = np.array(errflux_sv)
 
 ls_p1b_sv, freq_sv, power_sv, ls2_flux = supp.lombscargle_periodogram(time_sv, flux_sv, errflux_sv, dt=time_sv[0], plot=False)
 
+# def flat_filter(df, eps=0.25):
 
+eps = 0.25
+mean_mag = float(df['mag'].mean())
+print(len(df['mag'][abs(df['mag'] - mean_mag) > 0.25]))
+    
+len(df['mag'])
+print(int(np.round(len(df) / 2)))
+
+df['mag'][[0,1,2]]
 #%%
+time_corr = df['HJD'] - 2450000 # transform HDJ date
+y='mag'
+y_err = 'mag_err'
+bars = [0, int(np.round(len(df)/2.)), -1]
 
-'''
+fig, ax = plt.subplots()
 
+ax.plot(time_corr, df[y], '.k')
+ax.errorbar(time_corr.values[bars], df[y].values[bars], df[y_err].values[bars], fmt='.k', alpha=0.6)
+
+plt.show()
+#%%%%
+## Individual query 
 # gaia_ids = np.array(lcs.files(gaia_id=True))
 # filelist = lcs.files()
 
@@ -241,21 +274,34 @@ ls_p1b_sv, freq_sv, power_sv, ls2_flux = supp.lombscargle_periodogram(time_sv, f
 # index = int(np.argwhere(gaia_ids == gaia_id))
 # file = filelist[index]
 
-
-filelist = lcs.files()[:4000]
-
 # test =  LC_pro(file, show=True)
 
 
-
-# filelist[:26]
-
+###################################
+'''
+# Large query
+num = len(lcs.files())
+filelist = lcs.files()
 
 outlist = []
 for file in filelist:
     outpath = LC_pro(file, show=False)
     outlist.append(outpath)
     
+print('{:} LCs out of {:} with 10 or more points beyond 0.5 from mean_mag'.format(len(outlier_count), num))
+print('{:} \%'.format(len(outlier_count)*100 / num))
+
+
+   
 outlist = list(filter(None, outlist))
 
-_ = pan.panoptes_add(outlist, 'first_4000-v-band-mag')
+_ = pan.panoptes_add(outlist, 'filter_0.5mag_less_than_16mag')
+
+
+
+
+
+
+
+
+

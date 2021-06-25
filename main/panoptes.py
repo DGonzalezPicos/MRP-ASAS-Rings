@@ -30,6 +30,9 @@ def panoptes_add(filelist, subject_set_name='Testing'):
         
         subject.links.project = project
         subject.add_location(filename)
+        name = filename.split('/')[-1][:-4]
+        subject.metadata['gaia_id'] = name
+        
         subject.save()
         
         # subject.metadata.update(metadata)

@@ -6,7 +6,132 @@ Title: Script with plotting functions
 """
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import os
+mpl.rcParams['font.size'] = 14
 
+def plot_lc(df, name, y='mag', ax=None, label=None, errorbars=False, **kwargs):
+    
+    time_corr = df['HJD'] - 2450000 # transform HDJ date
+    y_err = y + '_err'
+    
+    ax = ax or plt.gca()
+    
+    if errorbars==True:
+        ax.errorbar(time_corr, df[y], df[y_err], fmt='.k', alpha=0.6, label=label)
+    else:
+        ax.plot(time_corr, df[y],'.k', alpha=0.6, label=label, **kwargs)
+        
+        bars = [0, int(np.round(len(df) / 2.)), -1]
+        ax.errorbar(time_corr.values[bars], df[y].values[bars], df[y_err].values[bars], fmt='.b', alpha=0.2)
+        
+    ax.set_title('GAIA_ID = ' + name)
+  
+    ax.set_ylabel('Magnitude')
+    ax.invert_yaxis()
+    ax.set_xlabel('HJD - 2450000')
+    mean_mag = np.nanmean(df['mag'])
+    mean_mag_str = 'Mean V-mag = {:.1f}'.format(mean_mag)
+        
+    if mean_mag > 17:
+        color_mag = 'red'
+    elif (mean_mag < 17) and (mean_mag > 15):
+        color_mag = 'darkorange'
+    else:
+        color_mag = 'darkgreen'
+    ax.text(x=0.02, y=0.89, s=mean_mag_str, transform=ax.transAxes, color=color_mag)
+        
+    if y == 'flux':
+        ax.set_ylabel('Flux')
+        ymin_auto, ymax_auto = ax.yaxis.get_data_interval()
+        ax.set_ylim(ymin=np.max([ymin_auto, 0.0]))
+        ax.set_ylim(ymax=np.min([ymax_auto, 2.0]))
+    return ax
+
+def plot_full(df, gaia_id, y='mag', ax=None):
+    
+    y_err = y + '_err'
+    ax = ax or plt.gca() # function embedded
+    markers = {'V':'.', 'g':'^'}
+    colors = {'V':['goldenrod','lightcoral','chocolate','red'], 
+              'g':['green', 'teal','aqua', 'indigo','fuchsia']}
+    for filter in df['Filter'].unique():
+        cams = df[df['Filter']==filter]['camera'].unique()
+        # colors = ['brown','darkorange','chocolate']
+        print('Plotting {:} in {:}-band with cameras {:}'.format(gaia_id, filter, cams))
+        for i, cam in enumerate(cams):
+            _ = plot_cam(df, cam=cam, y=y, ax=ax, 
+                         label=cam, color=colors[filter][i],
+                         marker=markers[filter])
+    if y == 'mag':
+        ax.invert_yaxis()  
+        ax.set_ylabel('Magnitude')
+    if y == 'flux':
+        ax.set_ylabel('Relative flux')
+        
+    ax.set_title('GAIA_ID = ' + str(gaia_id))
+    
+    ax.set_xlabel('HJD - 2450000')
+    
+    ax.legend(loc=(1.02,0.0))
+    plt.show()
+    return ax
+
+## Plot light curve DataFrame object with its different cameras
+def plot_cam(df, cam, y, ax=None, **kwargs):
+            lc = df[df['camera'] == cam] # select camera
+            # name = str(int(df['gaia_id'].unique())) 
+            time_corr = lc['HJD'] - 2450000 # transform HDJ date
+            y_err = y + '_err'
+            ax.errorbar(time_corr, lc[y], lc[y_err], fmt='.', alpha=0.4, **kwargs)
+            return ax
+        
+## Embedded function for selected V-band LCs with Gaia_ID (with different cams)
+def plot_gaiaID(gaia_id, lco, ax=None, save=False):
+    
+        file = os.path.join(lco.path, str(gaia_id)+ '.dat')
+        df = lco.data(file)
+        df['mag'] = df['mag'].astype('float')
+        
+        ax = ax or plt.gca() # function embedded
+        # fig, ax = plt.subplots(1, figsize=(14,7))
+        # _ = plot.plot_lc(df, name=str(gaia_id), ax=ax)
+    
+        
+        cams = df['camera'].unique()
+        colors = ['brown','darkorange','chocolate']
+        print('Plotting {:} with cameras {:}'.format(gaia_id, cams))
+        for i, cam in enumerate(cams):
+            _ = plot_cam(df, cam=cam, y='mag', ax=ax, label=cam, color=colors[i])
+        
+        ###########################
+        add_gband = False 
+        ###########################
+        
+        if add_gband == True:
+            g_path = '/home/dario/AstronomyLeiden/FRP/gband_api_fixed/'
+            gband = supp.LightCurveSet(g_path, 'dat', 'v') # read as v-band because new g-data is like old v-band
+            file_g = os.path.join(g_path, str(gaia_id)+ '.dat')
+            df_g = gband.data(file)
+            
+            g_cams = df_g['camera'].unique()
+            colors_g = ['green', 'teal','navy','plum']
+            print(g_cams)   
+            for i, cam in enumerate(g_cams):
+                _ = plot_cam(df_g, cam=cam, y='mag', ax=ax, label=cam, color=colors_g[i], marker='^')
+            
+        ax.invert_yaxis()   
+        ax.set_title('GAIA_ID = ' + str(gaia_id))
+        ax.set_ylabel('Magnitude')
+        ax.set_xlabel('HJD - 2450000')
+        
+        ax.legend()
+        plt.show()
+        if save == True:
+            outpath = '/home/dario/AstronomyLeiden/FRP/ring_candidates/' + str(gaia_id)+'.png'
+            plt.savefig(outpath, dpi=200, bbox_inches='tight') ## UNCOMMENT TO SAVE FIG
+            print('Saved {:}'.format(outpath))
+        return ax
 def plot_folded(time, flux, error, Pb, flux_fit, dt=0, xlim=(0,1)):
     '''
     this function makes a phase-folded plot of the provided light curve
