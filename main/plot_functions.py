@@ -10,7 +10,7 @@ import matplotlib as mpl
 import os
 mpl.rcParams['font.size'] = 14
 
-def plot_lc(df, name, y='mag', ax=None, label=None, errorbars=False, **kwargs):
+def plot_lc(df, name=None, y='mag', ax=None, label=None, errorbars=True, title=False, invert=False, **kwargs):
     
     time_corr = df['HJD'] - 2450000 # transform HDJ date
     y_err = y + '_err'
@@ -18,50 +18,56 @@ def plot_lc(df, name, y='mag', ax=None, label=None, errorbars=False, **kwargs):
     ax = ax or plt.gca()
     
     if errorbars==True:
-        ax.errorbar(time_corr, df[y], df[y_err], fmt='.k', alpha=0.6, label=label)
+        ax.errorbar(time_corr, df[y], df[y_err], fmt='.', alpha=0.6, label=label)
     else:
         ax.plot(time_corr, df[y],'.k', alpha=0.6, label=label, **kwargs)
         
-        bars = [0, int(np.round(len(df) / 2.)), -1]
-        ax.errorbar(time_corr.values[bars], df[y].values[bars], df[y_err].values[bars], fmt='.b', alpha=0.2)
-        
-    ax.set_title('GAIA_ID = ' + name)
+        # bars = [0, int(np.round(len(df) / 2.)), -1]
+        # ax.errorbar(time_corr.values[bars], df[y].values[bars], df[y_err].values[bars], fmt='.b', alpha=0.2)
+    
+    if title == True:
+        ax.set_title('GAIA_ID = ' + name)
   
     ax.set_ylabel('Magnitude')
-    ax.invert_yaxis()
+    if invert==True:
+        ax.invert_yaxis()
     ax.set_xlabel('HJD - 2450000')
     mean_mag = np.nanmean(df['mag'])
     mean_mag_str = 'Mean V-mag = {:.1f}'.format(mean_mag)
         
-    if mean_mag > 17:
-        color_mag = 'red'
-    elif (mean_mag < 17) and (mean_mag > 15):
-        color_mag = 'darkorange'
-    else:
-        color_mag = 'darkgreen'
-    ax.text(x=0.02, y=0.89, s=mean_mag_str, transform=ax.transAxes, color=color_mag)
+    # if mean_mag > 17:
+    #     color_mag = 'red'
+    # elif (mean_mag < 17) and (mean_mag > 15):
+    #     color_mag = 'darkorange'
+    # else:
+    #     color_mag = 'darkgreen'
+    # ax.text(x=0.02, y=0.89, s=mean_mag_str, transform=ax.transAxes, color=color_mag)
         
     if y == 'flux':
         ax.set_ylabel('Flux')
-        ymin_auto, ymax_auto = ax.yaxis.get_data_interval()
-        ax.set_ylim(ymin=np.max([ymin_auto, 0.0]))
-        ax.set_ylim(ymax=np.min([ymax_auto, 2.0]))
+    #     ymin_auto, ymax_auto = ax.yaxis.get_data_interval()
+    #     ax.set_ylim(ymin=np.max([ymin_auto, 0.0]))
+    #     ax.set_ylim(ymax=np.min([ymax_auto, 2.0]))
     return ax
 
 def plot_full(df, gaia_id, y='mag', ax=None):
     
     y_err = y + '_err'
     ax = ax or plt.gca() # function embedded
-    markers = {'V':'.', 'g':'^'}
+    markers = {'V':'.', 'g':'^','B':'v','I':'s','R':'d'}
     colors = {'V':['goldenrod','lightcoral','chocolate','red'], 
-              'g':['green', 'teal','aqua', 'indigo','fuchsia']}
+              'g':['green', 'teal','aqua', 'indigo','fuchsia'],
+              'B':['royalblue','navy','slateblue','indigo'],
+              'I':['purple','orchid','violet','pink'],
+              'R':['red','tomato','coral','peru']}
     for filter in df['Filter'].unique():
         cams = df[df['Filter']==filter]['camera'].unique()
         # colors = ['brown','darkorange','chocolate']
         print('Plotting {:} in {:}-band with cameras {:}'.format(gaia_id, filter, cams))
         for i, cam in enumerate(cams):
             _ = plot_cam(df, cam=cam, y=y, ax=ax, 
-                         label=cam, color=colors[filter][i],
+                         # label=cam, color=colors[filter][i],
+                         label=cam,
                          marker=markers[filter])
     if y == 'mag':
         ax.invert_yaxis()  
