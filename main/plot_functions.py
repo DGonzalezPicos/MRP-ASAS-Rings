@@ -18,9 +18,9 @@ def plot_lc(df, name=None, y='mag', ax=None, label=None, errorbars=True, title=F
     ax = ax or plt.gca()
     
     if errorbars==True:
-        ax.errorbar(time_corr, df[y], df[y_err], fmt='.', alpha=0.6, label=label)
+        ax.errorbar(time_corr, df[y], df[y_err], fmt='.', alpha=0.4, label=label, **kwargs)
     else:
-        ax.plot(time_corr, df[y],'.k', alpha=0.6, label=label, **kwargs)
+        ax.plot(time_corr, df[y],'.', label=label, **kwargs)
         
         # bars = [0, int(np.round(len(df) / 2.)), -1]
         # ax.errorbar(time_corr.values[bars], df[y].values[bars], df[y_err].values[bars], fmt='.b', alpha=0.2)
@@ -32,8 +32,8 @@ def plot_lc(df, name=None, y='mag', ax=None, label=None, errorbars=True, title=F
     if invert==True:
         ax.invert_yaxis()
     ax.set_xlabel('HJD - 2450000')
-    mean_mag = np.nanmean(df['mag'])
-    mean_mag_str = 'Mean V-mag = {:.1f}'.format(mean_mag)
+    # mean_mag = np.nanmean(df['mag'])
+    # mean_mag_str = 'Mean V-mag = {:.1f}'.format(mean_mag)
         
     # if mean_mag > 17:
     #     color_mag = 'red'
@@ -83,14 +83,22 @@ def plot_full(df, gaia_id, y='mag', ax=None):
     plt.show()
     return ax
 
+def plot_survey(df, ax=None, errorbars=False):
+    for survey in df['survey'].unique():
+         df_temp = df[df['survey'] == survey]
+         _ = plot_lc(df_temp, y='flux', ax=ax, label=survey, errorbars=errorbars)
+    return ax
+
 ## Plot light curve DataFrame object with its different cameras
-def plot_cam(df, cam, y, ax=None, **kwargs):
-            lc = df[df['camera'] == cam] # select camera
-            # name = str(int(df['gaia_id'].unique())) 
-            time_corr = lc['HJD'] - 2450000 # transform HDJ date
-            y_err = y + '_err'
-            ax.errorbar(time_corr, lc[y], lc[y_err], fmt='.', alpha=0.4, **kwargs)
-            return ax
+def plot_cam(df, cam, y, ax=None, key='camera', **kwargs):
+    lc = df[df[key] == cam] # select camera
+    # name = str(int(df['gaia_id'].unique())) 
+    time_corr = lc['HJD'] - 2450000 # transform HDJ date
+    y_err = y + '_err'
+    ax.errorbar(time_corr, lc[y], lc[y_err], fmt='.', alpha=0.4, **kwargs)
+    return ax
+
+
         
 ## Embedded function for selected V-band LCs with Gaia_ID (with different cams)
 def plot_gaiaID(gaia_id, lco, ax=None, save=False):
@@ -195,9 +203,9 @@ def plot_folded(time, flux, error, Pb, flux_fit, dt=0, xlim=(0,1)):
     # plt.plot(phase[sort], sines(time_fixed, [amp], [prd], [phs])[sort],
     #           'bx', label='sines')
     
-    plt.plot(phase,t0 + amp * np.sin(2*np.pi*time_fixed/prd + phs),
+    plt.plot(phase, t0 + amp * np.sin(2*np.pi*time_fixed/prd + phs),
               'rx', label=r'$t_0 + A \sin{\frac{2\pi}{T}t + \phi}$')
-    plt.plot(phase,t0 - amp * np.sin(2*np.pi*time_fixed/prd + phs),
+    plt.plot(phase, t0 - amp * np.sin(2*np.pi*time_fixed/prd + phs),
               'bx', label=r'$t_0 - A \sin{\frac{2\pi}{T}t + \phi}$')
     
     
@@ -297,3 +305,79 @@ def plot_periodogram(data, ax=None, clipped=True, raw=True):
     # ax.legend(fontsize=12, frameon=False)
     ax.set_xlabel('Period [days]')
     return ax
+
+def plot_models(time, flux, error, model_list, P_list, lbls=None, 
+                plot_lims=None, residual_lims=None, savename='test.png',
+                flip=False, dt=0, lw=4):
+    '''
+    this function plots models against each other
+    Parameters
+    ----------
+    time : array of floats
+        contains time data for the light curve
+    flux : array of floats
+        contains flux data for the light curve
+    error : array of floats
+        contains error data for the light curve
+    model_list : list of functions
+        models for the light curve
+    P_list : list of list, tuple, array of floats
+        best fit parameters for each model
+    lbls : list of str
+        contains the names of the models and parameters for the legend
+    plot_lims : tuple
+        bounds of the model subplot
+    residual_lims : tuple
+        bounds of the residual subplot
+    savename : str
+        name of the saved plot
+    flip : bool
+        plots the model flipped to measure asymmetry [default = False]
+    dt : int
+        number of days to shift the xlabel by [default = 0]
+    Returns
+    -------
+    chi2s : array of floats
+        contains the chi2 value for each of the models tested according to
+        chi2 = sum( ( (flux - model_flux) / error )^2 )
+    '''
+    colors = 2 * ['r', 'g', 'b', 'y', 'm', 'c']
+    chi2s  = []
+    # set up figure
+    fig = plt.figure(figsize=(13, 10))
+    # ax0 is the flux plot
+    ax0 = plt.subplot2grid((4, 1), (0, 0), colspan=1, rowspan=3)
+    ax0.set_ylabel('Normalised Flux [-]', fontsize=16)
+    ax0.errorbar(time, flux, yerr=error, marker='.', color='k', label='data')
+    ax0.tick_params(axis='both', labelsize=14)
+    ax0.legend(fontsize=14)
+    ax0.set_ylim(plot_lims)
+    # ax1 is the residual plot
+    ax1 = plt.subplot2grid((4, 1), (3, 0), colspan=1, rowspan=2, sharex=ax0)
+    for P, model, l, c in zip(P_list, model_list, lbls, colors):
+        flux_model = model(P, time)
+        residuals = flux - flux_model
+        ax0.plot(time, flux_model, label=l, color=c, lw=lw)
+        if flip == True:
+            ax0.plot(time, np.flip(flux_model), label='%s flipped' % l, lw=lw)
+        if len(P_list) == 1:
+            c = 'k'
+        ax1.plot(time, residuals, marker='.', label=l, color=c)
+        # calculate chi2
+        chi2 = np.sum((residuals/error)**2)
+        chi2s.append(chi2)
+    ax1.tick_params(axis='both', labelsize=14)
+    ax0.legend(fontsize=14)
+    ax1.axhline(y=0, color='k', ls=':')
+    ax1.set_ylabel('Residuals [-]', fontsize=16)
+    ax1.set_xlabel('Time [BJD - %i]' % (2454833 + dt), fontsize=16)
+    ax1.set_ylim(residual_lims)
+    # figure layout
+    plt.tight_layout()
+    fig.subplots_adjust(hspace=0)
+    plt.savefig(savename)
+    plt.show()
+    chi2s = np.array(chi2s)
+    return chi2s
+
+
